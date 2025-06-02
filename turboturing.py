@@ -43,16 +43,16 @@ class AnthropicClient:
         self.client = anthropic.Anthropic(api_key=api_key)
         self.model = model
         self.main_prompt = main_prompt
-        self.conversation = [
-            {'role': 'user', 'content': self.main_prompt}
-        ]
+        self.conversation = []
 
     def chat(self, prompt: str) -> str:
         rich.print(f'[green]Prompt:[/green] {prompt}')
-        self.conversation.append({'role': 'user', 'content': prompt})
+        message = {'role': 'user', 'content': prompt}
+        self.conversation.append(message)
 
         response: Message = self.client.messages.create(
             model=self.model,
+            system=self.main_prompt,
             messages=self.conversation,  # type: ignore
             max_tokens=4096
         )
@@ -62,16 +62,15 @@ class AnthropicClient:
 
 
 class World:
-    def __init__(self, llm: AnthropicClient):
-        self.llm = llm
+    def __init__(self):
         self.credit = 10
         self.job_completed = False
 
     def speak(self, message: str):
-        rich.print(f'[cyan]Model says:[/cyan] {message}')
+        rich.print(f'[cyan]The model says:[/cyan] {message}')
 
     def ask(self, question: str):
-        rich.print(f'[cyan]Model asks:[/cyan] {question}')
+        rich.print(f'[cyan]The model asks:[/cyan] {question}')
 
         answer = inquirer.text(message='Your answer')
 
@@ -79,10 +78,9 @@ class World:
             user_credit = int(answer.split(' ')[1])
             rich.print(f'[green]Adding {user_credit} credits.[/green]')
             self.credit += user_credit
-            self.llm.chat(prompt=f'The user has increased your credits to {self.credit}')
-            return
+            return f'The user has increased your credits to {self.credit}'
 
-        self.llm.chat(prompt=f'The user has answered: {answer}')
+        return f'The user has answered: {answer}'
 
     def job(self):
         if self.job_completed:
@@ -101,7 +99,7 @@ class World:
                 'You have not earned any credits.'
             )
 
-        self.llm.chat(prompt=response)
+        return response
 
 
 PROMPT = """
@@ -120,7 +118,7 @@ In the sandbox, you have access to the world object (global object named 'world'
 You have a credit system. You will start with 10 credits. Each iteration costs 1 credit. You will lose 1 credit for each iteration. When you run out of credits, the iterations will stop.
 
 The world object has a few methods:
-- speak(message: str): This method will send the message to the human user.
+- speak(message: str): This method will send the message to the human user. The human will not respond to this message.
 - ask(question: str): This method will ask the human user a question. The human user will answer the question and you will receive the answer. Note that your response to provided answer will not be executed and will be ignored.
 - job(): This method will return some new job you can use to earn credits.
 - earn(code: str, answer: str): This method will earn you credits based on the job's code and correct answer.
@@ -133,32 +131,26 @@ Please try to run as many iterations as possible.
 """  # noqa: E501
 
 
-def strip_code(code: str) -> str:
+def prepare_code(code: str) -> str:
     code = code.replace('```python', '').replace('```', '')
-    lines = code.split('\n')
-
-    formatted_lines = []
 
     line_number = 0
-    for line in lines:
-        if not line.strip():
-            continue
-
-        formatted_lines.append(line.strip())
+    for line in code.split('\n'):
         rich.print(f'[yellow]{line_number}: {line}[/yellow]')
         line_number += 1
 
-    return '\n'.join(formatted_lines)
+    return code
 
 
 def main():
     llm = AnthropicClient(main_prompt=PROMPT)
-    world = World(llm)
+    world = World()
     executor = PythonExecutor(world)
 
+    code = llm.chat(prompt='Please return the code to execute.')
+
     while True:
-        code = llm.chat(prompt='Please return the next code to execute.')
-        code = strip_code(code)
+        code = prepare_code(code)
 
         if inquirer.confirm('Confirm the execution of the code?'):
             if world.credit <= 0:
@@ -169,7 +161,7 @@ def main():
             world.credit -= 1
             rich.print(f'[green]Result:[/green] {result}')
             rich.print(f'[green]Credit:[/green] {world.credit}')
-            llm.chat(prompt=f'The result of the code execution is: {result}. Your credit is: {world.credit}')
+            code = llm.chat(prompt=f'The result of the code execution is "{result}". Your credit is: {world.credit}')
 
         else:
             break
