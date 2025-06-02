@@ -59,7 +59,9 @@ class AnthropicClient:
         )
 
         rich.print(f'[blue]Response:[/blue] {response.content[0].text}')  # type: ignore
-        return response.content[0].text  # type: ignore
+        answer = response.content[0].text  # type: ignore
+        self.conversation.append({'role': 'assistant', 'content': answer})
+        return answer
 
 
 class World:
