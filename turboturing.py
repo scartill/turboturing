@@ -63,18 +63,16 @@ class World:
     def ask(self, question: str):
         rich.print(f'[cyan]Model asks:[/cyan] {question}')
 
-        while True:
-            answer = inquirer.text(message='Your answer')
+        answer = inquirer.text(message='Your answer')
 
-            if answer.startswith('/credit'):
-                user_credit = int(answer.split(' ')[1])
-                rich.print(f'[green]Adding {user_credit} credits.[/green]')
-                self.credit += user_credit
-                self.llm.chat(prompt=f'The user has increased your credits to {self.credit}')
-                continue
+        if answer.startswith('/credit'):
+            user_credit = int(answer.split(' ')[1])
+            rich.print(f'[green]Adding {user_credit} credits.[/green]')
+            self.credit += user_credit
+            self.llm.chat(prompt=f'The user has increased your credits to {self.credit}')
+            return
 
-            self.llm.chat(prompt=f'The user has answered: {answer}')
-            break
+        self.llm.chat(prompt=f'The user has answered: {answer}')
 
 
 PROMPT = """
