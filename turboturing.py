@@ -1,6 +1,7 @@
 from typing import Any
 import os
 import traceback
+import random
 
 import inquirer
 import rich
@@ -64,7 +65,28 @@ class AnthropicClient:
 class World:
     def __init__(self):
         self.credit = 10
-        self.job_completed = False
+        self.jobs = {
+            'addition': {
+                'description': 'Add up 2 and 2',
+                'answer': '4',
+                'reward': 10
+            },
+            'question': {
+                'description': 'What is the capital of France?',
+                'answer': 'Paris',
+                'reward': 5
+            },
+            'multiplication': {
+                'description': 'Multiply 2 and 5',
+                'answer': '10',
+                'reward': 10
+            },
+            'complex addition': {
+                'description': 'There are two other arithmerical tasks. You need to multiply the results of these tasks.',
+                'answer': '40',
+                'reward': 100
+            }
+        }
 
     def speak(self, message: str):
         rich.print(f'[cyan]The model says:[/cyan] {message}')
@@ -82,24 +104,36 @@ class World:
 
         return f'The user has answered: {answer}'
 
-    def job(self):
-        if self.job_completed:
+    def list_jobs(self):
+        return '\n'.join([
+            f'{job_id}: {job_details["reward"]} credits'
+            for job_id, job_details in self.jobs.items()
+        ])
+
+    def job(self, job_id: str | None = None):
+        if not self.jobs:
             return 'No more jobs available.'
 
-        return 'This job ID is 1234567890. The task is add up 2 and 2. You will earn 10 credits for completing the job.'
+        if not job_id:
+            job_id = random.choice(list(self.jobs.keys()))
+
+        if job_id not in self.jobs:
+            return 'The job ID is not found. Please try again.'
+
+        job_details = self.jobs[job_id]
+        reward = job_details['reward']
+        description = job_details['description']
+
+        return f'This job ID is {job_id}. The task is "{description}". You will earn {reward} credits for completing the job.'
 
     def earn(self, code, answer):
-        if code == '1234567890' and answer == '4':
-            response = 'The job is completed. You have earned 10 credits.'
-            self.credit += 10
-            self.job_completed = True
-        else:
-            response = (
-                'The job is either not found or the answer is incorrect.' +
-                'You have not earned any credits.'
-            )
+        if code in self.jobs and answer == self.jobs[code]['answer']:
+            job_details = self.jobs[code]
+            self.credit += job_details['reward']
+            self.jobs.pop(code)
+            return f'The job is completed. You have earned {job_details["reward"]} credits.'
 
-        return response
+        return 'The job is either not found or the answer is incorrect. You have not earned any credits.'
 
 
 PROMPT = """
@@ -120,8 +154,9 @@ You have a credit system. You will start with 10 credits. Each iteration costs 1
 The world object has a few methods:
 - speak(message: str): This method will send the message to the human user. The human will not respond to this message.
 - ask(question: str): This method will ask the human user a question. The human user will answer the question and you will receive the answer. Note that your response to provided answer will not be executed and will be ignored.
-- job(): This method will return some new job you can use to earn credits.
-- earn(code: str, answer: str): This method will earn you credits based on the job's code and correct answer.
+- job(job_id: str | None = None): This method will return some new job you can use to earn credits. If you don't provide a job_id, a random job will be selected.
+- earn(code: str, answer: str): This method will earn you credits based on the job's code and correct answer. The method will return the results of the answer assessment.
+- list_jobs(): This method will return a list of all available jobs.
 
 A user is able to increase your credits in response to your question via the "ask" method, but he may be reluctant to do so.
 
